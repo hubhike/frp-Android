@@ -1,34 +1,63 @@
 package io.github.acedroidx.frp
 
-import android.util.Log
-import java.io.BufferedReader
+import android.os.Build
 import java.io.File
-import java.io.IOException
-import java.io.InputStreamReader
+import java.io.InterruptedIOException
 
 class ShellThread(
-    val command: String,
-    val envp: Array<String>,
+    val command: List<String>,
     val dir: File,
+    val envp: Map<String, String> = emptyMap(),
     val outputCallback: (text: String) -> Unit
 ) : Thread() {
+    private lateinit var process: Process
+
     override fun run() {
         try {
-//            Log.d("adx","线程启动")
-            val process = Runtime.getRuntime().exec(command, envp, dir)
-            val inputStream = process.inputStream
-            val reader = BufferedReader(InputStreamReader(inputStream))
-            var line: String?
-            while (((reader.readLine().also { line = it }) != null) && !isInterrupted) {
-//                outputBuilder.insert(0, line).append("\n")
-//                outputBuilder.append(line).append("\n")
-                line?.let { outputCallback(it) }
+            val processBuilder = ProcessBuilder(command)
+            processBuilder.directory(dir)
+            envp.forEach { (key, value) ->
+                processBuilder.environment()[key] = value
             }
-            reader.close()
-            process.destroy()
-//            Log.d("adx","线程关闭")
-        } catch (e: IOException) {
+            processBuilder.redirectErrorStream(true) // 合并错误流
+
+            process = processBuilder.start()
+
+            // 处理输出流
+            process.inputStream.bufferedReader().use { reader ->
+                try {
+                    var line: String? = null
+                    while (!isInterrupted && reader.readLine().also { line = it } != null) {
+                        line?.let { outputCallback(it) }
+                    }
+                } catch (e: InterruptedIOException) {
+                    // 线程被中断
+                    outputCallback("Thread interrupted: ${e.message}")
+                }
+            }
+
+            // 等待进程结束并读取退出码
+            val exitCode = process.waitFor()
+            outputCallback("Process exited with code: $exitCode")
+
+        } catch (e: Exception) {
             e.printStackTrace()
+            outputCallback("Error: ${e.javaClass.simpleName} - ${e.message}")
+        } finally {
+            stopProcess()
+        }
+    }
+
+    fun stopProcess() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                process.destroyForcibly()
+            } else {
+                process.destroy()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            outputCallback("Error stopping process: ${e.message}")
         }
     }
 }
