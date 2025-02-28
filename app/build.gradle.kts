@@ -41,8 +41,8 @@ android {
         minSdk = 23
         targetSdk = 35
         compileSdk = 35
-        versionCode = 6
-        versionName = "1.1.0"
+        versionCode = 8
+        versionName = "1.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -50,7 +50,9 @@ android {
 
         buildConfigField("String", "FrpVersion", "\"0.61.1\"")
         buildConfigField("String", "FrpcFileName", "\"libfrpc.so\"")
-        buildConfigField("String", "ConfigFileName", "\"frpc.toml\"")
+        buildConfigField("String", "FrpsFileName", "\"libfrps.so\"")
+        buildConfigField("String", "FrpcConfigFileName", "\"frpc.toml\"")
+        buildConfigField("String", "FrpsConfigFileName", "\"frps.toml\"")
     }
 
     buildTypes {
