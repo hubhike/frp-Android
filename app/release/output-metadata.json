@@ -1,18 +1,82 @@
 {
-  "version": 2,
+  "version": 3,
   "artifactType": {
     "type": "APK",
     "kind": "Directory"
   },
   "applicationId": "io.github.acedroidx.frp",
-  "variantName": "processReleaseResources",
+  "variantName": "release",
   "elements": [
     {
-      "type": "SINGLE",
+      "type": "UNIVERSAL",
       "filters": [],
-      "versionCode": 1,
-      "versionName": "1.0",
-      "outputFile": "app-release.apk"
+      "attributes": [],
+      "versionCode": 16,
+      "versionName": "1.4.3",
+      "outputFile": "frp-for-android_universal_1.4.3.apk"
+    },
+    {
+      "type": "ONE_OF_MANY",
+      "filters": [
+        {
+          "filterType": "ABI",
+          "value": "armeabi-v7a"
+        }
+      ],
+      "attributes": [],
+      "versionCode": 16,
+      "versionName": "1.4.3",
+      "outputFile": "frp-for-android_armeabi-v7a_1.4.3.apk"
+    },
+    {
+      "type": "ONE_OF_MANY",
+      "filters": [
+        {
+          "filterType": "ABI",
+          "value": "arm64-v8a"
+        }
+      ],
+      "attributes": [],
+      "versionCode": 16,
+      "versionName": "1.4.3",
+      "outputFile": "frp-for-android_arm64-v8a_1.4.3.apk"
+    },
+    {
+      "type": "ONE_OF_MANY",
+      "filters": [
+        {
+          "filterType": "ABI",
+          "value": "x86_64"
+        }
+      ],
+      "attributes": [],
+      "versionCode": 16,
+      "versionName": "1.4.3",
+      "outputFile": "frp-for-android_x86_64_1.4.3.apk"
     }
-  ]
+  ],
+  "elementType": "File",
+  "baselineProfiles": [
+    {
+      "minApi": 28,
+      "maxApi": 30,
+      "baselineProfiles": [
+        "baselineProfiles/1/frp-for-android_universal_1.4.3.dm",
+        "baselineProfiles/1/frp-for-android_armeabi-v7a_1.4.3.dm",
+        "baselineProfiles/1/frp-for-android_arm64-v8a_1.4.3.dm",
+        "baselineProfiles/1/frp-for-android_x86_64_1.4.3.dm"
+      ]
+    },
+    {
+      "minApi": 31,
+      "maxApi": 2147483647,
+      "baselineProfiles": [
+        "baselineProfiles/0/frp-for-android_universal_1.4.3.dm",
+        "baselineProfiles/0/frp-for-android_armeabi-v7a_1.4.3.dm",
+        "baselineProfiles/0/frp-for-android_arm64-v8a_1.4.3.dm",
+        "baselineProfiles/0/frp-for-android_x86_64_1.4.3.dm"
+      ]
+    }
+  ],
+  "minSdkVersionForDexing": 23
 }

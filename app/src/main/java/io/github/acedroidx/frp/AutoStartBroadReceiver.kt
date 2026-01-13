@@ -4,30 +4,74 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import androidx.appcompat.app.AppCompatActivity
 
 class AutoStartBroadReceiver : BroadcastReceiver() {
-    private val ACTION = "android.intent.action.BOOT_COMPLETED"
     override fun onReceive(context: Context, intent: Intent) {
-        //开机启动
-        val editor = context.getSharedPreferences("data", AppCompatActivity.MODE_PRIVATE)
-        val auto_start = editor.getBoolean(PreferencesKey.AUTO_START, false)
-        if (ACTION == intent.action && auto_start) {
-            val frpcConfigSet = editor.getStringSet(PreferencesKey.AUTO_START_FRPC_LIST, emptySet())
-            val frpsConfigSet = editor.getStringSet(PreferencesKey.AUTO_START_FRPS_LIST, emptySet())
-            val frpcConfigList = frpcConfigSet?.map { FrpConfig(FrpType.FRPC, it) }
-            val frpsConfigList = frpsConfigSet?.map { FrpConfig(FrpType.FRPS, it) }
-            val configList = (frpsConfigList ?: emptyList()) + (frpcConfigList ?: emptyList())
-            if (configList.isEmpty()) return
-            //开机启动
-            val mainIntent = Intent(context, ShellService::class.java)
-            mainIntent.setAction(ShellServiceAction.START)
-            mainIntent.putParcelableArrayListExtra(IntentExtraKey.FrpConfig, ArrayList(configList))
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(mainIntent)
-            } else {
-                context.startService(mainIntent)
+        val preferences = context.getSharedPreferences("data", Context.MODE_PRIVATE)
+        when (intent.action) {
+            Intent.ACTION_BOOT_COMPLETED -> {
+                val autoStartOnBoot = preferences.getBoolean(PreferencesKey.AUTO_START, false)
+                if (!autoStartOnBoot) return
+                val configList = AutoStartHelper.loadAutoStartConfigs(context)
+                startShellService(context, configList, ShellServiceAction.START)
             }
+
+            BroadcastAction.START, BroadcastAction.STOP -> {
+                val enableBroadcast = when (intent.action) {
+                    BroadcastAction.START -> preferences.getBoolean(
+                        PreferencesKey.AUTO_START_BROADCAST, false
+                    )
+
+                    BroadcastAction.STOP -> preferences.getBoolean(
+                        PreferencesKey.AUTO_STOP_BROADCAST, false
+                    )
+
+                    else -> false
+                }
+                if (!enableBroadcast) return
+
+                val allowExtra =
+                    preferences.getBoolean(PreferencesKey.AUTO_START_BROADCAST_EXTRA, false)
+
+                val configList = if (allowExtra) {
+                    val type =
+                        AutoStartHelper.parseType(intent.getStringExtra(BroadcastExtraKey.TYPE))
+                    val name = intent.getStringExtra(BroadcastExtraKey.NAME)
+
+                    if (type != null && !name.isNullOrBlank()) {
+                        AutoStartHelper.loadAutoStartConfigs(
+                            context, typeFilter = type, nameFilter = name
+                        )
+                    } else {
+                        AutoStartHelper.loadAutoStartConfigs(context)
+                    }
+                } else {
+                    AutoStartHelper.loadAutoStartConfigs(context)
+                }
+
+                val serviceAction = if (intent.action == BroadcastAction.START) {
+                    ShellServiceAction.START
+                } else {
+                    ShellServiceAction.STOP
+                }
+
+                startShellService(context, configList, serviceAction)
+            }
+        }
+    }
+
+    private fun startShellService(
+        context: Context, configList: List<FrpConfig>, action: String
+    ) {
+        if (configList.isEmpty()) return
+
+        val mainIntent = Intent(context, ShellService::class.java)
+        mainIntent.action = action
+        mainIntent.putParcelableArrayListExtra(IntentExtraKey.FrpConfig, ArrayList(configList))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(mainIntent)
+        } else {
+            context.startService(mainIntent)
         }
     }
 }

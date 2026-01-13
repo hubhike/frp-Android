@@ -1,5 +1,6 @@
 package io.github.acedroidx.frp.ui.theme
 
+import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -8,18 +9,32 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
+
+object ThemeModeKeys {
+    const val DARK = "dark"
+    const val LIGHT = "light"
+    const val FOLLOW_SYSTEM = "system"
+
+    fun normalize(value: String?, fallback: String = FOLLOW_SYSTEM): String {
+        return when (value) {
+            DARK, "深色", "Dark" -> DARK
+            LIGHT, "浅色", "Light" -> LIGHT
+            FOLLOW_SYSTEM, "跟随系统", "Follow system" -> FOLLOW_SYSTEM
+            else -> fallback
+        }
+    }
+}
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = Purple80, secondary = PurpleGrey80, tertiary = Pink80
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
+    primary = Purple40, secondary = PurpleGrey40, tertiary = Pink40
 
     /* Other default colors to override
     background = Color(0xFFFFFBFE),
@@ -37,21 +52,44 @@ fun FrpTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,
+    themeMode: String? = null,  // accepts ThemeModeKeys or null
     content: @Composable () -> Unit
 ) {
+    val context = LocalContext.current
+    // 根据 themeMode 决定是否使用深色主题
+    val useDarkTheme = when (themeMode) {
+        ThemeModeKeys.DARK -> true
+        ThemeModeKeys.LIGHT -> false
+        ThemeModeKeys.FOLLOW_SYSTEM, null -> darkTheme
+        else -> darkTheme
+    }
+
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            if (useDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
 
-        darkTheme -> DarkColorScheme
+        useDarkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
 
+    // 动态设置状态栏文字颜色，跟随应用主题而非系统模式
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as? Activity)?.window
+            window?.let {
+                WindowCompat.getInsetsController(it, view).apply {
+                    // useDarkTheme=true(深色主题) → 浅色文字图标
+                    // useDarkTheme=false(浅色主题) → 深色文字图标
+                    isAppearanceLightStatusBars = !useDarkTheme
+                    isAppearanceLightNavigationBars = !useDarkTheme
+                }
+            }
+        }
+    }
+
     MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
+        colorScheme = colorScheme, typography = Typography, content = content
     )
 }

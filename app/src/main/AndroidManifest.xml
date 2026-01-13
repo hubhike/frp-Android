@@ -4,10 +4,13 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE"
+        tools:ignore="ForegroundServicesPolicy" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:allowBackup="true"
@@ -18,8 +21,36 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Frp"
         tools:targetApi="tiramisu">
-        <activity android:name=".ConfigActivity" />
+        <activity
+            android:name=".ConfigActivity"
+            android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".OnboardingActivity" />
         <activity android:name=".AboutActivity" />
+        <activity android:name=".SettingsActivity" />
+
+        <!-- Tasker Plugin Action -->
+        <activity
+            android:name=".tasker.ActivityConfigStartFrp"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="Start frp Config">
+            <intent-filter>
+                <action android:name="com.twofortyfouram.locale.intent.action.EDIT_SETTING" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Tasker Plugin Action - Stop frp -->
+        <activity
+            android:name=".tasker.ActivityConfigStopFrp"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="Stop frp Config">
+            <intent-filter>
+                <action android:name="com.twofortyfouram.locale.intent.action.EDIT_SETTING" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
         <meta-data
             android:name="Website"
@@ -38,11 +69,12 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleInstance">
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
+                <!-- Quick Settings Tile 长按跳转 -->
+                <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
             </intent-filter>
         </activity>
 
@@ -55,8 +87,42 @@
 
                 <category android:name="android.intent.category.HOME" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="io.github.acedroidx.frp.START" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="io.github.acedroidx.frp.STOP" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </receiver>
 
+        <!-- Quick Settings Tile -->
+        <service
+            android:name=".FrpTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_launcher_foreground"
+            android:label="@string/quick_tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="false" />
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true" />
+        </service>
+
+        <provider
+            android:name=".FrpConfigProvider"
+            android:authorities="io.github.acedroidx.frp.config"
+            android:exported="true"
+            android:grantUriPermissions="true" />
     </application>
 
 </manifest>
