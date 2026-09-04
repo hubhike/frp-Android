@@ -49,7 +49,7 @@ class FrpConfigProvider : ContentProvider() {
                 FrpType.entries.forEach { type ->
                     val names = type.getDir(context).list()?.toList() ?: emptyList()
                     names.forEach { name ->
-                        cursor.addRow(arrayOf(id++, type.typeName, name))
+                        cursor.addRow(arrayOf<Any>(id++, type.typeName, name))
                     }
                 }
             }
@@ -64,7 +64,7 @@ class FrpConfigProvider : ContentProvider() {
                 if (frpType != null) {
                     val file = File(frpType.getDir(context), name)
                     if (file.exists()) {
-                        cursor.addRow(arrayOf(0L, frpType.typeName, name))
+                        cursor.addRow(arrayOf<Any>(0L, frpType.typeName, name))
                     }
                 }
             }
@@ -111,10 +111,20 @@ class FrpConfigProvider : ContentProvider() {
             dir.mkdirs()
         }
         val file = File(dir, name)
+        val isNew = isWrite && !file.exists()
         if (!isWrite && !file.exists()) {
             throw FileNotFoundException("File not found")
         }
-        return ParcelFileDescriptor.open(file, modeBits)
+        val pfd = ParcelFileDescriptor.open(file, modeBits)
+        // 通过接口写入新配置时，默认开启自启动
+        if (isNew) {
+            val autoStartKey = frpType.getAutoStartPreferencesKey()
+            val set = prefs.getStringSet(autoStartKey, emptySet())?.toMutableSet()
+                ?: mutableSetOf()
+            set.add(name)
+            prefs.edit().putStringSet(autoStartKey, set).apply()
+        }
+        return pfd
     }
 
     override fun insert(uri: Uri, values: ContentValues?): Uri? {
@@ -122,7 +132,36 @@ class FrpConfigProvider : ContentProvider() {
     }
 
     override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?): Int {
-        throw UnsupportedOperationException("Delete not supported")
+        val context = context ?: return 0
+        val prefs = context.getSharedPreferences("data", android.content.Context.MODE_PRIVATE)
+        val match = uriMatcher.match(uri)
+
+        // 删除属于写操作，必须显式允许
+        if (!prefs.getBoolean(PreferencesKey.ALLOW_CONFIG_WRITE, false)) {
+            throw SecurityException("Config write not allowed")
+        }
+
+        return when (match) {
+            CODE_CONFIG_ITEM -> {
+                val type = uri.pathSegments.getOrNull(0)
+                val name = uri.pathSegments.getOrNull(1)
+                if (type.isNullOrBlank() || name.isNullOrBlank()) {
+                    return 0
+                }
+                val frpType = AutoStartHelper.parseType(type) ?: return 0
+                val file = File(frpType.getDir(context), name)
+                val deleted = if (file.exists()) file.delete() else false
+                if (deleted) {
+                    context.contentResolver.notifyChange(uri, null)
+                    1
+                } else {
+                    0
+                }
+            }
+
+            CODE_CONFIGS -> 0
+            else -> throw FileNotFoundException("Unknown URI: $uri")
+        }
     }
 
     override fun update(

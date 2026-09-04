@@ -87,7 +87,9 @@ keystore.properties
 .idea
 .kotlin/
 .claude/
+.opencode/
 *.tar.gz
 baselineProfiles/
 TASKER_PLUGIN_DEVELOPMENT_GUIDE.md
 app/src/main/jniLibs/
+.devcontainer/devcontainer.json

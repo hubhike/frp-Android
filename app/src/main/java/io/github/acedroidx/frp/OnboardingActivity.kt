@@ -4,9 +4,11 @@ import android.Manifest
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.ActivityNotFoundException
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -57,6 +59,8 @@ class OnboardingActivity : ComponentActivity() {
     private val themeMode = MutableStateFlow(ThemeModeKeys.FOLLOW_SYSTEM)
     private val notificationPermissionGranted = MutableStateFlow(true)
     private val ignoringBatteryOptimizations = MutableStateFlow(false)
+    private val storagePermissionGranted = MutableStateFlow(false)
+    private val localNetworkPermissionGranted = MutableStateFlow(true)
 
     private lateinit var preferences: SharedPreferences
 
@@ -67,12 +71,32 @@ class OnboardingActivity : ComponentActivity() {
         notificationPermissionGranted.value = granted
     }
 
+    // 存储权限请求：Android 11+ 跳转到全部文件访问授权页，低版本使用运行时权限
+    private val storagePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        storagePermissionGranted.value = granted
+    }
+
     // 电池优化豁免申请
     private val batteryOptimizationLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
         // 回到应用后更新当前状态，避免用户手动取消时状态错误
         updateBatteryOptimizationStatus()
+    }
+
+    private val manageStoragePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        updateStoragePermissionStatus()
+    }
+
+    // 局域网权限请求：Android 17+ 需要此权限才能访问局域网资源
+    private val localNetworkPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        localNetworkPermissionGranted.value = granted
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -85,6 +109,8 @@ class OnboardingActivity : ComponentActivity() {
 
         updateNotificationPermissionStatus()
         updateBatteryOptimizationStatus()
+        updateStoragePermissionStatus()
+        updateLocalNetworkPermissionStatus()
 
         enableEdgeToEdge()
         setContent {
@@ -93,6 +119,8 @@ class OnboardingActivity : ComponentActivity() {
                 true
             )
             val batteryIgnored by ignoringBatteryOptimizations.collectAsStateWithLifecycle(false)
+            val storageGranted by storagePermissionGranted.collectAsStateWithLifecycle(false)
+            val localNetworkGranted by localNetworkPermissionGranted.collectAsStateWithLifecycle(true)
 
             FrpTheme(themeMode = currentTheme) {
                 Scaffold(topBar = {
@@ -111,8 +139,12 @@ class OnboardingActivity : ComponentActivity() {
                         contentPadding = contentPadding,
                         notificationGranted = notificationGranted,
                         batteryOptimizationIgnored = batteryIgnored,
+                        storagePermissionGranted = storageGranted,
+                        localNetworkPermissionGranted = localNetworkGranted,
                         onRequestNotificationPermission = { requestNotificationPermission() },
                         onRequestBatteryOptimization = { requestIgnoreBatteryOptimization() },
+                        onRequestStoragePermission = { requestStoragePermission() },
+                        onRequestLocalNetworkPermission = { requestLocalNetworkPermission() },
                         onContinue = { finishOnboarding() })
                 }
             }
@@ -137,9 +169,62 @@ class OnboardingActivity : ComponentActivity() {
             powerManager.isIgnoringBatteryOptimizations(packageName)
     }
 
+    private fun updateStoragePermissionStatus() {
+        storagePermissionGranted.value = when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> Environment.isExternalStorageManager()
+            else -> ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    // Android 17 (SDK 37) 及以上需要 ACCESS_LOCAL_NETWORK 权限才能访问局域网
+    // 低版本无需此权限，默认视为已授予
+    private fun updateLocalNetworkPermissionStatus() {
+        if (Build.VERSION.SDK_INT >= 37) {
+            val granted = ContextCompat.checkSelfPermission(
+                this, Manifest.permission.ACCESS_LOCAL_NETWORK
+            ) == PackageManager.PERMISSION_GRANTED
+            localNetworkPermissionGranted.value = granted
+        } else {
+            localNetworkPermissionGranted.value = true
+        }
+    }
+
     private fun requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    private fun requestStoragePermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                    data = Uri.parse("package:$packageName")
+                }
+                manageStoragePermissionLauncher.launch(intent)
+            } catch (e: ActivityNotFoundException) {
+                try {
+                    val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                    manageStoragePermissionLauncher.launch(intent)
+                } catch (inner: ActivityNotFoundException) {
+                    Log.w(
+                        "Onboarding",
+                        "Storage permission settings activity not found: ${inner.message}"
+                    )
+                }
+            }
+            return
+        }
+
+        storagePermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+    }
+
+    private fun requestLocalNetworkPermission() {
+        if (Build.VERSION.SDK_INT >= 37) {
+            localNetworkPermissionLauncher.launch(Manifest.permission.ACCESS_LOCAL_NETWORK)
         }
     }
 
@@ -220,13 +305,19 @@ class OnboardingActivity : ComponentActivity() {
         contentPadding: PaddingValues,
         notificationGranted: Boolean,
         batteryOptimizationIgnored: Boolean,
+        storagePermissionGranted: Boolean,
+        localNetworkPermissionGranted: Boolean,
         onRequestNotificationPermission: () -> Unit,
         onRequestBatteryOptimization: () -> Unit,
+        onRequestStoragePermission: () -> Unit,
+        onRequestLocalNetworkPermission: () -> Unit,
         onContinue: () -> Unit
     ) {
         val scrollState = rememberScrollState()
         val showNotificationAction = remember(notificationGranted) { !notificationGranted }
         val showBatteryAction = remember(batteryOptimizationIgnored) { !batteryOptimizationIgnored }
+        val showStorageAction = remember(storagePermissionGranted) { !storagePermissionGranted }
+        val showLocalNetworkAction = remember(localNetworkPermissionGranted) { !localNetworkPermissionGranted }
 
         Column(
             modifier = Modifier
@@ -240,6 +331,20 @@ class OnboardingActivity : ComponentActivity() {
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Start
+            )
+
+            OnboardingCard(
+                title = stringResource(R.string.onboarding_local_network_title),
+                description = stringResource(R.string.onboarding_local_network_desc),
+                status = {
+                    StatusText(
+                        active = localNetworkPermissionGranted,
+                        inactiveText = stringResource(R.string.onboarding_local_network_status_missing)
+                    )
+                },
+                actionLabel = stringResource(R.string.onboarding_local_network_action),
+                onAction = onRequestLocalNetworkPermission,
+                enabled = showLocalNetworkAction
             )
 
             OnboardingCard(
@@ -270,6 +375,20 @@ class OnboardingActivity : ComponentActivity() {
                 enabled = showBatteryAction
             )
 
+            OnboardingCard(
+                title = stringResource(R.string.onboarding_storage_title),
+                description = stringResource(R.string.onboarding_storage_desc),
+                status = {
+                    StatusText(
+                        active = storagePermissionGranted,
+                        inactiveText = stringResource(R.string.onboarding_storage_status_missing)
+                    )
+                },
+                actionLabel = stringResource(R.string.onboarding_storage_action),
+                onAction = onRequestStoragePermission,
+                enabled = showStorageAction
+            )
+
             Spacer(modifier = Modifier.height(12.dp))
 
             Button(
@@ -290,8 +409,12 @@ class OnboardingActivity : ComponentActivity() {
                 contentPadding = PaddingValues(0.dp),
                 notificationGranted = false,
                 batteryOptimizationIgnored = false,
+                storagePermissionGranted = false,
+                localNetworkPermissionGranted = false,
                 onRequestNotificationPermission = {},
                 onRequestBatteryOptimization = {},
+                onRequestStoragePermission = {},
+                onRequestLocalNetworkPermission = {},
                 onContinue = {})
         }
     }

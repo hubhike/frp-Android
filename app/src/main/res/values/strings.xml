@@ -66,7 +66,7 @@
     <string name="config_write_title">Allow other apps to write configs</string>
     <string name="config_read_help">Expose config files via ContentProvider for read-only access. Enable only if you trust the requesting app; configs may contain sensitive tokens.</string>
     <string name="config_write_help">Allow other apps to modify config files via ContentProvider. Use with caution; unsafe writes may break frp connectivity.</string>
-    <string name="config_io_help_message">Before using, turn on the "frp Config I/O" read/write switches in Settings and be aware of the possible disclosure of config passwords.\n\nExamples:\n\n# List all configs (requires "Allow read")\nadb shell content query --uri content://io.github.acedroidx.frp.config\n\n# Read a single config (requires "Allow read")\nadb shell content read --uri content://io.github.acedroidx.frp.config/frpc/example.toml\n\n# Write a single config (requires "Allow write")\n# Overwrite the device config with local example.toml\nadb shell content write --uri content://io.github.acedroidx.frp.config/frpc/example.toml &lt; example.toml</string>
+    <string name="config_io_help_message">Before using, turn on the "frp Config I/O" read/write switches in Settings and be aware of the possible disclosure of config passwords.\n\nExamples:\n\n# List all configs (requires "Allow read")\nadb shell content query --uri content://io.github.acedroidx.frp.config\n\n# Read a single config (requires "Allow read")\nadb shell content read --uri content://io.github.acedroidx.frp.config/frpc/example.toml\n\n# Write a single config (requires "Allow write")\n# Overwrite the device config with local example.toml; some devices may require deleting first before writing.\nadb shell content write --uri content://io.github.acedroidx.frp.config/frpc/example.toml &lt; example.toml\n\n# Delete a single config (requires "Allow write")\nadb shell content delete --uri content://io.github.acedroidx.frp.config/frpc/example.toml</string>
     <string name="about_app_author">App author (AceDroidX):</string>
     <string name="about_contributors">Special thanks to the following contributors:</string>
     <string name="about_contributor_ahsaboy">ahsaboy: added app icon, quick toggle, Tasker integration, and many optimizations</string>
@@ -106,8 +106,16 @@
     <string name="onboarding_battery_desc">Allow frp to ignore battery optimizations so the service is less likely to be killed.</string>
     <string name="onboarding_battery_status_missing">Battery optimizations may stop background service</string>
     <string name="onboarding_battery_action">Request optimization exemption</string>
+    <string name="onboarding_storage_title">(Optional) Grant storage permission</string>
+    <string name="onboarding_storage_desc">Grant this permission if your frp configuration references certificate, key, or other files stored on the device.\n\nIf you do not use such files, you can skip this step and grant permission later when needed.</string>
+    <string name="onboarding_storage_status_missing">Not granted. Configs that reference certificate files may not work.</string>
+    <string name="onboarding_storage_action">Grant storage permission</string>
     <string name="onboarding_status_done">Done</string>
     <string name="onboarding_continue">Continue</string>
+    <string name="onboarding_local_network_title">Grant local network permission</string>
+    <string name="onboarding_local_network_desc">frp needs access to the local network to establish tunnels. On Android 17+, this permission is required for any local network communication.</string>
+    <string name="onboarding_local_network_status_missing">Local network permission not granted. frp cannot access the local network.</string>
+    <string name="onboarding_local_network_action">Grant local network permission</string>
     <string name="settings_reopen_onboarding">Reopen welcome onboarding</string>
     <string name="backup_title">Backup &amp; Restore</string>
     <string name="backup_import_button">Import Backup</string>
